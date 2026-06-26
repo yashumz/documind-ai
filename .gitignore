@@ -1,0 +1,27 @@
+# ── Secrets — NEVER commit these ──────────────
+.env
+*.pem
+*.key
+*_accessKeys.csv
+
+# ── Python ────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+.uv/
+
+# ── Uploads (stored in S3, not git) ───────────
+uploads/
+*.pdf
+*.docx
+*.xlsx
+
+# ── OS files ──────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────
+.cursor/
+.vscode/
