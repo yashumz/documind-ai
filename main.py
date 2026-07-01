@@ -19,24 +19,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.ingest import router as ingest_router
 from api.query  import router as query_router
 
+from observability.langfuse_setup import setup_langfuse, flush_langfuse
+from observability.middleware import LangfuseTracingMiddleware
+
 
 # ── Lifespan: runs at startup and shutdown ────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    WHAT:  Code that runs when the app starts and stops
-    WHY:   We need to:
-           → Verify all services are connected at startup
-           → Flush any pending Langfuse traces at shutdown
 
-    Real life: Like an opening and closing checklist
-               for a restaurant — verify everything works
-               before opening, clean up before closing
-    """
     # ── STARTUP ───────────────────────────────────────────────
     print("\n" + "=" * 55)
     print("  DocuMind AI — Starting up")
     print("=" * 55)
+
+    # NEW: Setup Langfuse first — before anything else
+    setup_langfuse()
 
     # Verify Weaviate is reachable
     try:
@@ -48,6 +45,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Weaviate connection failed: {e}")
         print("   Make sure EC2 instance is running")
+
+    # Verify embedding model loads
+    try:
+        from ingestion.embedder import embed_query
+        embed_query("test")
+        print("✅ Embedding model ready")
+    except Exception as e:
+        print(f"⚠️  Embedding model failed: {e}")
+
+    print("=" * 55)
+    print("  DocuMind AI — Ready to serve requests")
+    print("=" * 55 + "\n")
+
+    yield  # App runs here
+
+    # ── SHUTDOWN ──────────────────────────────────────────────
+    print("\n[DocuMind] Shutting down...")
+    flush_langfuse()    # NEW: flush pending traces
+    print("[DocuMind] ✅ Goodbye!")
 
 # Verify embedding model loads
     try:
@@ -78,6 +94,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+app.add_middleware(LangfuseTracingMiddleware)
 
 # ── CORS middleware ───────────────────────────────────────────
 # CORS = Cross-Origin Resource Sharing

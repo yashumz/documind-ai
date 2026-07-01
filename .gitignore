@@ -1,10 +1,10 @@
-# ── Secrets — NEVER commit these ──────────────
+# ── Secrets — NEVER commit these ──────────────────────────
 .env
 *.pem
 *.key
 *_accessKeys.csv
 
-# ── Python ────────────────────────────────────
+# ── Python ────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
@@ -12,16 +12,40 @@ __pycache__/
 *.egg-info/
 .uv/
 
-# ── Uploads (stored in S3, not git) ───────────
+# ── Uploads (stored in S3, not git) ───────────────────────
 uploads/
 *.pdf
 *.docx
 *.xlsx
+*.jpg
+*.png
+*.jpeg
 
-# ── OS files ──────────────────────────────────
+# ── Test files (not production code) ──────────────────────
+test_sample.pdf
+test_image.jpg
+create_test_pdf.py
+
+# ── ML model cache (huge files, auto-downloaded) ──────────
+# These are downloaded automatically on first run
+# No need to commit them — adds hundreds of MB to repo
+.cache/
+*.onnx
+*.safetensors
+*.bin
+
+# ── Node / Frontend ───────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# ── OS files ──────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# ── IDE ───────────────────────────────────────
+# ── IDE ───────────────────────────────────────────────────
 .cursor/
 .vscode/
+*.swp

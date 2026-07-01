@@ -18,6 +18,9 @@ from retrieval.hybrid_search     import hybrid_search
 from retrieval.reranker          import rerank
 from generation.claude_generator import generate_answer
 
+from langfuse import observe
+
+
 router = APIRouter()
 
 
@@ -65,6 +68,7 @@ class QueryResponse(BaseModel):
 
 
 @router.post("/query", response_model=QueryResponse)
+@observe(name="api-query-endpoint")
 async def query_documents(request: QueryRequest):
     """
     WHAT:  Accepts a question and returns a grounded answer

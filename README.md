@@ -11,8 +11,8 @@
 
 DocuMind AI Demo
 
-**Live demo:** [documind-ai-inky.vercel.app](https://documind-ai-inky.vercel.app)  | 
-**API docs:** [/docs](http://localhost:8000/docs)  | 
+**Live demo:** [documind-ai-inky.vercel.app](https://documind-ai-inky.vercel.app) |
+**API docs:** [/docs](http://localhost:8000/docs) |
 **Observability:** [Langfuse Dashboard](https://cloud.langfuse.com)
 
 ---
@@ -23,7 +23,6 @@ Upload any PDF → ask questions in natural language → get grounded answers wi
 
 Built to demonstrate production-grade RAG engineering:
 
-
 | Capability          | Implementation                                  |
 | ------------------- | ----------------------------------------------- |
 | Multi-modal parsing | Unstructured.io — text, tables, embedded images |
@@ -32,7 +31,6 @@ Built to demonstrate production-grade RAG engineering:
 | Generation          | Claude Sonnet 4.6 with grounded prompting       |
 | Observability       | Langfuse — traces, cost, latency per query      |
 | Storage             | Weaviate (self-hosted on AWS EC2) + S3          |
-
 
 ---
 
@@ -114,20 +112,39 @@ User uploads PDF
 
 ---
 
-## Benchmark results
+## Evaluation results
 
-Evaluated on 50-question test set over `test_sample.pdf`:
+Evaluated using [Ragas 0.2.15](https://github.com/vibrantlabsai/ragas) with Claude Sonnet 4.6
+as the eval LLM and sentence-transformers/all-MiniLM-L6-v2 for embeddings.
+Dataset: 25-question golden set covering factual extraction, table lookups, multi-hop reasoning,
+and out-of-scope queries. Full methodology: [`evals/ragas_eval.ipynb`](evals/ragas_eval.ipynb)
 
+| Metric              | Score | Interpretation                                                  |
+| ------------------- | ----- | --------------------------------------------------------------- |
+| Answer correctness  | 0.93  | Answers factually match ground truth across 25 diverse Q&A pairs |
+| Context recall      | 0.96  | Retrieval surfaces required information 96% of the time         |
+| Answer relevancy    | 0.85  | Answers address the questions asked                             |
+| Context precision   | 0.84  | Low noise in retrieved chunks — RRF fusion working as intended  |
 
-| Metric              | Naive RAG | + Hybrid | + Reranker |
-| ------------------- | --------- | -------- | ---------- |
-| Context precision   | 0.71      | 0.81     | **0.89**   |
-| Answer faithfulness | 0.74      | 0.83     | **0.91**   |
-| Avg cost/query      | $0.008    | $0.007   | **$0.006** |
-| Avg latency         | 4.2s      | 5.1s     | **6.8s**   |
+**Dataset design:** 25 questions across 6 categories — factual extraction (Q1-8), table lookups
+(Q9-13), inference/reasoning (Q14-18), multi-hop (Q19-21), product/tech (Q22-23), and
+out-of-scope queries (Q24-25) where the system should decline rather than hallucinate.
 
+**Note on faithfulness metric:** Excluded due to a known parsing incompatibility between
+Ragas 0.2.15 and Claude Sonnet 4.6 (silent zero verdicts on correctly grounded answers).
+`answer_correctness` used instead — measures factual accuracy against verified ground truth,
+which is more meaningful for document Q&A evaluation.
 
-Reranking adds ~1.7s latency but improves precision by **+25%**.
+**Key findings:**
+
+- Context recall (0.96): Hybrid BM25 + dense search with RRF reliably surfaces required
+  information — strongest result across the eval suite
+- Answer correctness (0.93): Claude generates factually accurate answers across diverse
+  question types including multi-hop reasoning over financial tables
+- Context precision (0.84): Multi-hop questions pull in slightly more chunks than needed —
+  identified as the primary retrieval optimization target
+- Out-of-scope handling: System correctly declines on questions with no answer in the document
+  (employee headcount, profit margin) without hallucinating responses
 
 ---
 
@@ -156,26 +173,29 @@ Metrics tracked per query:
 ```
 documind-ai/
 ├── ingestion/
-│   ├── parser.py          # Unstructured.io PDF parsing
-│   ├── embedder.py        # sentence-transformers embeddings
-│   ├── weaviate_store.py  # Weaviate CRUD + search
-│   └── s3_handler.py      # AWS S3 upload/download
+│   ├── parser.py           # Unstructured.io PDF parsing
+│   ├── embedder.py         # sentence-transformers embeddings
+│   ├── weaviate_store.py   # Weaviate CRUD + search
+│   └── s3_handler.py       # AWS S3 upload/download
 ├── retrieval/
-│   ├── hybrid_search.py   # BM25 + dense + RRF fusion
-│   └── reranker.py        # BGE cross-encoder reranking
+│   ├── hybrid_search.py    # BM25 + dense + RRF fusion
+│   └── reranker.py         # BGE cross-encoder reranking
 ├── generation/
 │   └── claude_generator.py # Grounded answer generation
 ├── observability/
-│   ├── langfuse_setup.py  # Langfuse initialisation
-│   ├── middleware.py      # HTTP request tracing
-│   ├── tracer.py          # Custom span helpers
-│   └── cost_calculator.py # Per-query cost tracking
+│   ├── langfuse_setup.py   # Langfuse initialisation
+│   ├── middleware.py       # HTTP request tracing
+│   ├── tracer.py           # Custom span helpers
+│   └── cost_calculator.py  # Per-query cost tracking
 ├── api/
-│   ├── ingest.py          # POST /api/v1/ingest
-│   └── query.py           # POST /api/v1/query
-├── frontend/              # React + Vite UI
-├── main.py                # FastAPI app entry point
-└── test_connections.py    # Service health check
+│   ├── ingest.py           # POST /api/v1/ingest
+│   └── query.py            # POST /api/v1/query
+├── evals/
+│   ├── ragas_eval.ipynb    # Ragas evaluation notebook
+│   └── golden_dataset.py   # 25-question golden eval dataset
+├── frontend/               # React + Vite UI
+├── main.py                 # FastAPI app entry point
+└── test_connections.py     # Service health check
 ```
 
 ---
@@ -232,6 +252,13 @@ cd frontend && npm install && npm run dev
 ```bash
 uv run python test_connections.py
 # ✅ Weaviate · ✅ S3 · ✅ Anthropic · ✅ Langfuse
+```
+
+### 7. Run evals
+
+```bash
+cd evals
+jupyter notebook ragas_eval.ipynb
 ```
 
 ---
@@ -293,17 +320,20 @@ Response:
   (text + tables + images) using Unstructured.io and Claude Vision,
   deployed on AWS EC2 with Weaviate vector database
 
-- Implemented hybrid BM25 + dense retrieval with RRF fusion and
-  BGE cross-encoder reranking; improved context precision from
-  0.71 → 0.89 on 50-question benchmark (+25%)
+- Implemented hybrid BM25 + dense retrieval with RRF fusion and BGE
+  cross-encoder reranking; evaluated with Ragas across 25-question golden
+  dataset — answer correctness 0.93, context recall 0.96
 
-- Instrumented full pipeline with Langfuse observability — tracking
-  token cost, p95 latency, and retrieval metrics per query;
-  average cost $0.006/query with full trace visibility
+- Designed structured eval framework with 6 question categories (factual,
+  table lookup, multi-hop, inference, out-of-scope); identified context
+  precision gap in multi-hop queries as primary optimization target
 
-- Deployed React frontend (Neural Terminal design) with real-time
-  pipeline stage visualization, drag-drop upload, and per-query
-  cost and citation display
+- Instrumented full pipeline with Langfuse observability — tracking token
+  cost, latency, and retrieval metrics per query; average $0.006/query
+  with full trace visibility
+
+- Deployed React frontend (Neural Terminal design) with real-time pipeline
+  stage visualization, drag-drop upload, and per-query cost and citation display
 ```
 
 ---
